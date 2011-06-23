@@ -749,7 +749,7 @@ class MeioUploadBehavior extends ModelBehavior {
 					// Try resize original image
 					if($options['resizeOriginal'] === true && $options['resize']['width'] > 0 && $options['resize']['height'] > 0) {
 						$params = $options['resize'];
-						$this->_resize($file, $params);
+						$this->_resize($saveAs, $params);
 					}
 				}
 				
