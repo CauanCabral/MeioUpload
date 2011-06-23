@@ -43,6 +43,12 @@ class MeioUploadBehavior extends ModelBehavior {
 		'allowedExt' => array('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico'),
 		'default' => false, // Not sure what this does
 		'zoomCrop' => false, // Whether to use ZoomCrop or not with PHPThumb
+		'resizeOriginal' => false, // If you want original image to be resized
+		'resize' => array( // Settings used in resize of original image
+			'maxWidth' => 0, // Target width for image
+			'maxHeight' => 0, // Target height for image
+			'quality' => 75, // Quality of resized image
+		),
 		'thumbnails' => true,
 		'thumbsizes' => array(
 			// Place any custom thumbsize in model config instead,
@@ -732,10 +738,21 @@ class MeioUploadBehavior extends ModelBehavior {
 					continue;
 				}
 
-				// If the file is an image, try to make the thumbnails
-				if ((count($options['thumbsizes']) > 0) && count($options['allowedExt']) > 0 && in_array($data[$model->alias][$fieldName]['type'], $this->_imageTypes)) {
-					$this->_createThumbnails($model, $data, $fieldName, $saveAs, $ext, $options);
+				// If the file is an image 
+				if (count($options['allowedExt']) > 0 && in_array($data[$model->alias][$fieldName]['type'], $this->_imageTypes)) {
+					
+					// Try to make the thumbnails
+					if((count($options['thumbsizes']) > 0)) {
+						$this->_createThumbnails($model, $data, $fieldName, $saveAs, $ext, $options);
+					}
+					
+					// Try resize original image
+					if($options['resizeOriginal'] === true && $options['resize']['width'] > 0 && $options['resize']['height'] > 0) {
+						$params = $options['resize'];
+						$this->_resize($file, $params);
+					}
 				}
+				
 				if ($options['removeOriginal']) {
 					$this->_removeOriginal($saveAs);
 				}
@@ -795,11 +812,22 @@ class MeioUploadBehavior extends ModelBehavior {
 					$result = array('return' => false, 'reason' => 'validation', 'extra' => array('field' => $fieldName, 'error' => $copyResults));
 					continue;
 				}
-
-				// If the file is an image, try to make the thumbnails
-				if ((count($options['thumbsizes']) > 0) && count($options['allowedExt']) > 0 && in_array($data[$model->alias][$fieldName]['type'], $this->_imageTypes)) {
-					$this->_createThumbnails($model, $data, $fieldName, $saveAs, $ext, $options);
+				
+				// If the file is an image 
+				if (count($options['allowedExt']) > 0 && in_array($data[$model->alias][$fieldName]['type'], $this->_imageTypes)) {
+					
+					// Try to make the thumbnails
+					if((count($options['thumbsizes']) > 0)) {
+						$this->_createThumbnails($model, $data, $fieldName, $saveAs, $ext, $options);
+					}
+					
+					// Try resize original image
+					if($options['resizeOriginal'] === true && $options['resize']['maxWidth'] > 0 && $options['resize']['maxHeight'] > 0) {
+						$params = $options['resize'];
+						$this->_resize($saveAs, $params);
+					}
 				}
+				
 
 				// Update model data
 				$data[$model->alias][$options['fields']['dir']] = $options['dir'];
@@ -922,6 +950,47 @@ class MeioUploadBehavior extends ModelBehavior {
 		// Creating thumbnail
 		if ($phpThumb->GenerateThumbnail()) {
 			if (!$phpThumb->RenderToFile($target)) {
+				$this->_addError('Could not render image to: '.$target);
+			}
+		}
+	}
+	
+/**
+ * Function to resize images
+ * 
+ * @param string $file File name (without path)
+ * @param array $params
+ */
+	function _resize($file, $params) {
+		$params = array_merge(
+			$this->defaultOptions['resize'],
+			$params
+		);
+
+		if(!class_exists('phpthumb'))
+		{
+			// Import phpThumb class
+			App::import('Vendor','phpthumb', array('file' => 'phpThumb'.DS.'phpthumb.class.php'));
+		}
+
+		// Configuring thumbnail settings
+		$phpThumb = new phpthumb;
+		$phpThumb->setSourceFilename($file);
+
+		$phpThumb->w = $params['maxWidth'];
+		$phpThumb->h = $params['maxHeight'];
+		$phpThumb->q = $params['quality'];
+
+		$imageArray = explode(".", $file);
+		$phpThumb->config_output_format = $imageArray[1];
+		unset($imageArray);
+
+		// Setting whether to die upon error
+		$phpThumb->config_error_die_on_error = true;
+		
+		// Creating thumbnail
+		if ($phpThumb->GenerateThumbnail()) {
+			if (!$phpThumb->RenderToFile($file)) {
 				$this->_addError('Could not render image to: '.$target);
 			}
 		}
