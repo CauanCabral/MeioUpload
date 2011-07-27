@@ -749,7 +749,7 @@ class MeioUploadBehavior extends ModelBehavior {
 					// Try resize original image
 					if($options['resizeOriginal'] === true && $options['resize']['width'] > 0 && $options['resize']['height'] > 0) {
 						$params = $options['resize'];
-						$this->_resize($saveAs, $params);
+						$this->_resize($model, $saveAs, $params);
 					}
 				}
 				
@@ -824,7 +824,7 @@ class MeioUploadBehavior extends ModelBehavior {
 					// Try resize original image
 					if($options['resizeOriginal'] === true && $options['resize']['maxWidth'] > 0 && $options['resize']['maxHeight'] > 0) {
 						$params = $options['resize'];
-						$this->_resize($saveAs, $params);
+						$this->_resize($model, $saveAs, $params);
 					}
 				}
 				
@@ -958,10 +958,11 @@ class MeioUploadBehavior extends ModelBehavior {
 /**
  * Function to resize images
  * 
+ * @param object $model Reference to model
  * @param string $file File name (without path)
  * @param array $params
  */
-	function _resize($file, $params) {
+	function _resize(&$model, $file, $params) {
 		$params = array_merge(
 			$this->defaultOptions['resize'],
 			$params
@@ -974,7 +975,7 @@ class MeioUploadBehavior extends ModelBehavior {
 		}
 
 		// Configuring thumbnail settings
-		$phpThumb = new phpthumb;
+		$phpThumb = new phpThumb();
 		$phpThumb->setSourceFilename($file);
 
 		$phpThumb->w = $params['maxWidth'];
@@ -986,13 +987,17 @@ class MeioUploadBehavior extends ModelBehavior {
 		unset($imageArray);
 
 		// Setting whether to die upon error
-		$phpThumb->config_error_die_on_error = true;
+		$phpThumb->config_error_die_on_error = false;
 		
-		// Creating thumbnail
+		// Creating resized image
 		if ($phpThumb->GenerateThumbnail()) {
 			if (!$phpThumb->RenderToFile($file)) {
-				$this->_addError('Could not render image to: '.$target);
+				$this->_addError('Could not render image to: ' . $file);
 			}
+		}
+		else
+		{
+			$this->_addError('Could not resize image: ' . $file);
 		}
 	}
 
